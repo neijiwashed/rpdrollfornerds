@@ -8,36 +8,69 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 router = Router()
 
-def get_roll(text):
+def roll_dice(text):
     text = text.replace(" ", "").lower()
     match = re.match(r'^(\d*)d(\d+)([+-]\d+)?$', text)
     if not match: return None
+    
     count = int(match.group(1)) if match.group(1) else 1
     sides = int(match.group(2))
     mod = int(match.group(3)) if match.group(3) else 0
+    
     rolls = [random.randint(1, sides) for _ in range(count)]
-    total = sum(rolls) + mod
-    return {"total": total, "natural": rolls if count > 1 else rolls[0], "formula": text}
+    
+    return {
+        "rolls": rolls,
+        "mod": mod,
+        "count": count,
+        "sides": sides,
+        "formula": text
+    }
 
 @router.inline_query()
 async def inline_handler(query: types.InlineQuery):
     input_text = query.query.strip().lower()
     results = []
+    
     formulas = ["d20", "d100"] if not input_text else [input_text]
+    
     for f in formulas:
-        data = get_roll(f)
-        if data:
-            msg_text = f"({data['formula']}) {data['total']} [{data['natural']}]"
-            res_title = f"Кинуть {data['formula']}"
-            unique_id = f"RESULT_{data['total']}_{random.randint(1000, 9999)}"
+        data = roll_dice(f)
+        if not data: continue
+        
+        total_sum = sum(data['rolls']) + data['mod']
+        rolls_str = str(data['rolls']) if data['count'] > 1 else str(data['rolls'][0])
+        
+        mod_str = ""
+        if data['mod'] > 0: mod_str = f"+{data['mod']}"
+        elif data['mod'] < 0: mod_str = f"{data['mod']}"
+
+        msg_text_1 = f"🎲 ({data['formula']}): {total_sum}\nКубы: {rolls_str} {mod_str}"
+        
+        results.append(types.InlineQueryResultArticle(
+            id=f"RES_SUM_{random.randint(10000, 99999)}",
+            title=f"Кинуть {data['formula']} (к итогу)",
+            description=f"Результат: {total_sum}",
+            input_message_content=types.InputTextMessageContent(message_text=msg_text_1)
+        ))
+
+        if data['count'] > 1 and data['mod'] != 0:
+            rolls_modified = [r + data['mod'] for r in data['rolls']]
+            total_per_die = sum(rolls_modified)
+            
+            msg_text_2 = f"🔥 ({data['formula']} к каждому): {total_per_die}\nКубы: {rolls_modified}"
+            
             results.append(types.InlineQueryResultArticle(
-                id=unique_id, title=res_title, description="Нажми для броска",
-                input_message_content=types.InputTextMessageContent(message_text=msg_text)
+                id=f"RES_EACH_{random.randint(10000, 99999)}",
+                title=f"Кинуть {data['formula']} (к каждому)",
+                description=f"Результат: {total_per_die} (бонус {mod_str} к кости)",
+                input_message_content=types.InputTextMessageContent(message_text=msg_text_2)
             ))
+
     await query.answer(results, cache_time=0, is_personal=True)
 
 async def handle(request):
-    return web.Response(text="Bot is online")
+    return web.Response(text="Bot is online and rolling!")
 
 async def main():
     dp = Dispatcher()
@@ -49,7 +82,7 @@ async def main():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', int(os.getenv("PORT", 10000)))
     
-    print("🟢 Бот запускается...")
+    print("🟢 Бот запущен с новой функцией двойного подсчета...")
     await asyncio.gather(
         dp.start_polling(bot, skip_updates=True),
         site.start()
