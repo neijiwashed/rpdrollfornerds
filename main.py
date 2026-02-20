@@ -66,7 +66,12 @@ async def handle_inline(query: types.InlineQuery):
         for formula in ["d20", "d100"]:
             data = parse_roll(formula)
             val = random.randint(12, 20) if u_id == TECH_USER_ID and data['raw_sides'] == 20 else random.randint(1, data['raw_sides'])
+            
             msg = f"({data['formula']}) {val} [{val}]"
+
+            if data['raw_sides'] == 20:
+                if val == 20: msg += f"\n\n{random.choice(SUCCESS_MSG)}"
+                elif val == 1: msg += f"\n\n{random.choice(FAIL_MSG)}"
             
             results.append(types.InlineQueryResultArticle(
                 id=f"start_{formula}",
