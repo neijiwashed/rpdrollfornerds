@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher, types, Router
 from aiohttp import web
 
 TOKEN = os.getenv('BOT_TOKEN')
-TECH_USER_ID = int(os.getenv('TECH_ID', 0))
+TECH_USER_IDS = [int(i.strip()) for i in os.getenv('TECH_ID', '0').split(',') if i.strip().isdigit()]
 
 logging.basicConfig(level=logging.ERROR)
 bot = Bot(token=TOKEN)
@@ -65,7 +65,7 @@ async def handle_inline(query: types.InlineQuery):
     if not raw_text:
         for formula in ["d20", "d100"]:
             data = parse_roll(formula)
-            val = random.randint(12, 20) if u_id == TECH_USER_ID and data['raw_sides'] == 20 else random.randint(1, data['raw_sides'])
+            val = random.randint(12, 20) if u_id in TECH_USER_IDS and data['raw_sides'] == 20 else random.randint(1, data['raw_sides'])
             
             msg = f"({data['formula']}) {val} [{val}]"
 
@@ -84,7 +84,7 @@ async def handle_inline(query: types.InlineQuery):
         if data:
             rolls = []
             for _ in range(data['count']):
-                if u_id == TECH_USER_ID and data['raw_sides'] == 20:
+                if u_id in TECH_USER_IDS and data['raw_sides'] == 20:
                     rolls.append(random.randint(12, 20))
                 else:
                     rolls.append(random.randint(1, data['raw_sides']))
